@@ -2,7 +2,7 @@
 
 Real-Time Fog-Adaptive Face Recognition Pipeline.
 
-Extension of FAREP (FYP-1) into a real-time, deployable system with TensorRT optimization.
+Extension of FAREP (FYP) into a real-time, deployable system with TensorRT optimization.
 
 ## Structure
 - configs/ — hyperparameters and paths
