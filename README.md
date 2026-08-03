@@ -1,6 +1,6 @@
 # RT-FAREP: Real-Time Fog-Adaptive Face Recognition
 
-**A research-oriented extension of FAREP (FYP), evaluating whether single-image dehazing improves face recognition robustness under fog/haze — with a precisely quantified operational range and honest real-time performance analysis.**
+**A research-oriented extension of FAREP (FYP): a recognition-aware fine-tuning approach for face-preserving image dehazing, with a precisely quantified operational range and honest real-time performance analysis.**
 
 > 🏙️ **Motivation:** In cities like Lahore and Delhi, dense winter smog severely degrades CCTV and surveillance face recognition accuracy. This project asks a concrete question: *does dehazing actually help recognition, and if so, under what conditions does it stop helping?*
 
@@ -28,7 +28,37 @@
 
 Consistent with the original AOD-Net paper's reported range (~19–20 dB PSNR on SOTS-outdoor), confirming a correctly reproduced baseline. Fog-density (β) vs. quality shows the expected negative correlation — performance degrades as fog gets denser (see `results/fog_density_correlation.png`).
 
-### 2. Does Dehazing Improve Face Recognition Under Fog?
+### 2. Recognition-Aware Fine-Tuning (Core Contribution)
+
+Generic dehazing models (including the pretrained AOD-Net baseline above) are optimized purely for visual quality (PSNR/SSIM) — they have no notion of whether their output preserves an identity's recognizability. We fine-tuned AOD-Net with a **combined loss** that adds a recognition-consistency term:
+
+```
+L = MSE(dehazed, clear) + λ · (1 − cosine_similarity(Embed(dehazed), Embed(clear)))
+```
+
+- **Training data:** 1,161 face images (10 LFW identities, 80/20 split) with fog synthetically applied on-the-fly (β ∈ [0.5, 3.0]).
+- **Embedding model:** FaceNet (InceptionResnetV1, VGGFace2-pretrained), frozen, used only to compute the recognition-consistency signal during training. A *different* backbone (ArcFace/InsightFace) is used for evaluation below — this cross-backbone setup is a deliberate check that the fine-tuned dehazing generalizes, rather than overfitting to one recognizer's embedding space.
+- **Result — Pretrained vs. Fine-tuned, evaluated with ArcFace:**
+
+| β (fog density) | Pretrained similarity | Fine-tuned similarity | Improvement |
+|---:|---:|---:|---:|
+| 2.5 | 0.740 | 0.788 | +6.4% |
+| 2.8 | 0.724 | 0.765 | +5.7% |
+| 3.0 | 0.692 | 0.746 | +7.8% |
+| 3.3 | 0.637 | 0.684 | +7.4% |
+| 3.6 | 0.578 | 0.658 | +13.7% |
+| 3.9 | 0.529 | 0.684 | +29.2% |
+| 4.2 | *0 faces detected (fail)* | 0.561 | **operational range extended** |
+
+**Findings:**
+- **Average recognition-confidence improvement: +11.7%** across all fog levels where both models detected a face.
+- **The improvement grows with fog density** (6.4% → 29.2%) — fine-tuning helps disproportionately more exactly where it matters most: the dense-fog regime where generic dehazing starts to fail.
+- **Operational range extended from β≈3.9 to β≈4.2** — at β=4.2, the pretrained model fails to detect a face at all, while the fine-tuned model still produces a usable match.
+
+Full data: `results/pretrained_operational_range.csv`, `results/finetuned_operational_range.csv`, `results/pretrained_vs_finetuned_merged.csv`
+Visualization: `results/pretrained_vs_finetuned_comparison.png`, `results/training_curves.png`
+
+### 3. Does Dehazing Improve Face Recognition Under Fog? (Baseline Study)
 
 Using LFW face images with synthetically applied fog (atmospheric scattering model, β swept from 0 to 6.0), we compared **raw recognition** vs. **recognition after AOD-Net dehazing**:
 
@@ -43,7 +73,7 @@ Using LFW face images with synthetically applied fog (atmospheric scattering mod
 Full data: `results/fog_recognition_experiment.csv`, `results/fog_recognition_zoom.csv`
 Visualization: `results/fog_vs_recognition_robustness.png`, `results/extreme_fog_example.png`
 
-### 3. Real-Time Performance (CPU inference)
+### 4. Real-Time Performance (CPU inference)
 
 | Configuration | FPS | Notes |
 |---|:---:|---|
@@ -70,8 +100,9 @@ rt-farep/
 │   ├── fog_vs_recognition_robustness.png
 │   ├── extreme_fog_example.png
 │   └── video_pipeline_results_optimized.csv
-└── weights/
-    └── aod_net.pth                     # Pretrained AOD-Net weights
+└── models/
+    ├── aod_net.pth                     # Pretrained AOD-Net weights (baseline)
+    └── aod_net_finetuned.pth           # Recognition-aware fine-tuned AOD-Net
 ```
 
 ---
@@ -94,9 +125,11 @@ rt-farep/
 
 ## Limitations & Future Work
 
-- **Dense fog ceiling:** Single-image dehazing cannot recover identity beyond β ≈ 3.3 — a physics-based limitation. Future work could explore multi-frame temporal fusion or learned priors conditioned on estimated fog density (FiLM-style conditioning), which was part of the original FAREP FYP design.
-- **Real-time deployment:** Current benchmarks are CPU-only due to environment constraints; GPU/edge-accelerator deployment is expected to close the real-time gap.
-- **Single-subject validation:** The fog-robustness experiment uses one identity (George W. Bush, LFW) as a controlled case study. Scaling to multi-identity verification (full LFW pairs protocol) is a natural next step.
+- **Dense fog ceiling remains, but is pushed further:** Even the fine-tuned model eventually fails at extreme fog density (transmission → 0), a physics-based limitation no single-image method can fully overcome. Fine-tuning extended the usable range (β≈3.9 → β≈4.2) rather than eliminating the ceiling.
+- **Small fine-tuning run:** 10 epochs on 1,161 images from 10 identities — sufficient to demonstrate the recognition-aware loss works, but a larger-scale run (more identities, more epochs, learning-rate scheduling) would likely yield further gains. The loss plateaued after ~2 epochs, consistent with AOD-Net's very low parameter count (1,761).
+- **Real-time deployment:** Current FPS benchmarks are CPU-only due to an environment-specific CUDA/cuDNN toolkit mismatch; GPU/edge-accelerator deployment is expected to close the real-time gap.
+- **Single-subject evaluation case study:** The β-sweep comparison uses one identity (George W. Bush, LFW) for controlled, interpretable analysis. Scaling to a full multi-identity verification protocol (e.g., LFW pairs) is a natural next step.
+- **FiLM-conditioned dehazing** (fog-level-aware, as in the original FAREP FYP design) is a natural extension of this fine-tuning approach — conditioning the network explicitly on estimated fog density rather than training across a fixed β range.
 
 ---
 
