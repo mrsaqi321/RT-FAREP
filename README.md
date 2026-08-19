@@ -123,7 +123,6 @@ Verified working — `ort.get_available_providers()` returns `['TensorrtExecutio
 ---
 
 ## Repository Structure
-## Repository Structure
 
 ```text
 rt-farep/
