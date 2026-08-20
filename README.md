@@ -133,6 +133,7 @@ rt-farep/
 ├── results/
 │   ├── aodnet_baseline_results.csv        # Per-image PSNR/SSIM (500 images)
 │   ├── v2_tar_far_table.csv               # 6,000-pair LFW verification results (TAR, AUC, CI, failure rate)
+│   ├── v2_results_plots.png               # Operational reliability / TAR visualization (V2)
 │   ├── fog_density_correlation.png
 │   ├── best_case.png
 │   ├── worst_case.png
@@ -154,7 +155,7 @@ rt-farep/
 
 ## How to Reproduce
 
-1. Open `notebooks/RT_FAREP_V2.ipynb` for the main verification benchmark, or `notebooks/rt_farep_pipeline.ipynb` for the original dehazing baseline and fine-tuning run — both in a GPU-enabled environment (Kaggle recommended; verified on Tesla T4).
+1. Open `notebooks/rt-farep-v2.ipynb` for the main verification benchmark, or `notebooks/rt_farep_pipeline.ipynb` for the original dehazing baseline and fine-tuning run — both in a GPU-enabled environment (Kaggle recommended; verified on Tesla T4).
 2. Run the ONNX Runtime install sequence exactly as shown in **Environment Notes** above — installing `onnxruntime-gpu` without pinning the version has previously caused a silent CPU fallback.
 3. **Do not** run `pip install --upgrade torchvision` — see Environment Notes.
 4. Run cells sequentially, top to bottom, in a single session without intermediate restarts. Dataset paths assume Kaggle's `/kaggle/input/` structure; adjust if running locally.
